@@ -2,7 +2,7 @@
 
 Copyright (c) 2018, NICK CALVERT
 
-A MATLAB tool for using Stereolitohrapy (.stl) files to generate Regions/Volumes of Interest (ROIs/VOIs) on SPECT/CT images and use these to calculate calibration factors.
+A MATLAB tool for using Stereolithography (.stl) files to generate Regions/Volumes of Interest (ROIs/VOIs) on SPECT/CT images and use these to calculate calibration factors.
 
 This tool has been written and tested using SPECT/CT files obtained using the GE Discovery 670 SPECT/CT scanner located at the Christie NHS Foundation Trust.
 Images from other scanners may work but are not supported.
@@ -24,10 +24,14 @@ WARNING: The Optimise stl Positions tool is experimental and may not work very w
 
 The application uses functions from the following MATLAB toolboxes that were downloaded from the MathWorks File Exchange:
 dicm2nii Copyright (c) 2017, Xiangrui Li: https://uk.mathworks.com/matlabcentral/fileexchange/42997-xiangruili-dicm2nii
+
 inpolyhedron Copyright (c) 2015, Sven
 : https://uk.mathworks.com/matlabcentral/fileexchange/37856-inpolyhedron-are-points-inside-a-triangulated-volume-
+
 Tools for NIfTI and ANALYZE image Copyright (c) 2014, Jimmy Shen: https://uk.mathworks.com/matlabcentral/fileexchange/8797-tools-for-nifti-and-analyze-image
+
 progressbar Copyright (c) 2005, Steve Hoelzer: https://uk.mathworks.com/matlabcentral/fileexchange/6922-progressbar
+
 stlwrite Copyright (c) 2018, Sven Holcomb: https://uk.mathworks.com/matlabcentral/fileexchange/20922-stlwrite-write-ascii-or-binary-stl-files
 
 
