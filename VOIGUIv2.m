@@ -22,7 +22,7 @@ function varargout = VOIGUIv2(varargin)
 
 % Edit the above text to modify the response to help VOIGUIv2
 
-% Last Modified by GUIDE v2.5 22-Jun-2018 16:48:42
+% Last Modified by GUIDE v2.5 28-Jun-2018 14:24:49
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -69,23 +69,33 @@ for i = 1:nCTFiles
 end
 CTimgPosition = zeros(size(CT_img,3),3);
 for i = 1:size(CT_img,3)
-CTimgPosition(i,:) = cthdr{i}.ImagePositionPatient;
+    CTimgPosition(i,:) = cthdr{i}.ImagePositionPatient;
 end
 CTPixSize = cthdr{1}.PixelSpacing;
 handles.CThdr = cthdr;
-% CTSliceThick = cthdr{1}.SliceThickness;
 handles.CTsize = size(CT_img);
 handles.PixCent1 = CTimgPosition(1,1) + (0:(handles.CTsize(1)-1))*CTPixSize(1);
 handles.PixCent2 =CTimgPosition(1,2) + (0:(handles.CTsize(2)-1))*CTPixSize(2);
 handles.PixCent3 = CTimgPosition(:,3);
 handles.CT_img = CT_img;
 
-[FileName,PathName] = uigetfile('*.dcm','Select the SPECT file to open','MultiSelect', 'off');
-handles.SPECT_img = double(squeeze(dicm_img([PathName FileName])));
+[FileName,PathName] = uigetfile('*.dcm','Select the SPECT files to open','MultiSelect', 'on');
+if (iscell(FileName))
+    n_imgs = length(FileName);
+    handles.SPECT_img = double(squeeze(dicm_img([PathName FileName{1}])));
+    specthdr = dicm_hdr([PathName FileName{1}]);
+    for i = 1:n_imgs
+        handles.SPECT_Images{i} = double(squeeze(dicm_img([PathName FileName{i}])));
+    end
+else
+    handles.SPECT_img = double(squeeze(dicm_img([PathName FileName])));
+    handles.SPECT_Images{1} = double(squeeze(dicm_img([PathName FileName])));
+    specthdr = dicm_hdr([PathName FileName]);
+end
+handles.n_imgs = n_imgs;
+handles.FileNames = FileName;
 handles.SPECTsize = size(handles.SPECT_img);
-specthdr = dicm_hdr([PathName FileName]);
 handles.SPECThdr = specthdr;
-% SPECTscantime = specthdr.AcquisitionTime;
 SPECTPixSize = specthdr.PixelSpacing;
 SPECTSliceThick = specthdr.SliceThickness;
 SPECTImagePosition = specthdr.Unknown_0054_0022.Item_1.ImagePositionPatient;
@@ -93,11 +103,6 @@ handles.SPECTPixCent1 = SPECTImagePosition(1) + (0:(handles.SPECTsize(1)-1))*SPE
 handles.SPECTPixCent2 =  (SPECTImagePosition(2) + (0:(handles.SPECTsize(2)-1))*SPECTPixSize(2));
 handles.SPECTPixCent3 = (SPECTImagePosition(3) - (0:(handles.SPECTsize(3)-1))*SPECTSliceThick);
 
-% handles.CT_img = varargin{1};
-% handles.PixCent1 = varargin{2};
-% handles.PixCent2 = varargin{3};
-% handles.PixCent3 = varargin{4};
-% handles.SPECT_img = varargin{5};
 [FileName,PathName] = uigetfile('*.stl','Select the STL files to open','MultiSelect', 'on');
 if(iscell(FileName))
     for i = 1:length(FileName)
@@ -114,19 +119,6 @@ else
 end
 handles.Surface = Surface;
 handles.OrganNames = ['All' FileName];
-
-% handles.ROIs = varargin{5};
-% handles.OrganNames = ['All' varargin{6}];
-% if (length(varargin) >5)
-%     handles.SPECTPixCent1 = varargin{6};
-%     handles.SPECTPixCent2 = varargin{7};
-%     handles.SPECTPixCent3 = varargin{8};
-% else
-%     handles.SPECTPixCent1 = ((0:127)-127/2).*4.41964;
-%     handles.SPECTPixCent2 = ((0:127)-127/2).*4.41964;
-%     handles.SPECTPixCent3 = ((0:127)-127/2).*4.41964;
-% end
-
 handles.PixxSize = abs(handles.PixCent1(2) - handles.PixCent1(1));
 handles.PixySize = abs(handles.PixCent2(2) - handles.PixCent2(1));
 handles.PixzSize = abs(handles.PixCent3(2) - handles.PixCent3(1));
@@ -150,21 +142,15 @@ set(handles.slider2, 'SliderStep', [1/handles.ImSize(2) , 10/handles.ImSize(2) ]
 set(handles.slider3,'Min',1);
 set(handles.slider3,'Max',handles.ImSize(3));
 set(handles.slider3, 'SliderStep', [1/handles.ImSize(3) , 10/handles.ImSize(3) ]);
-% handles.xSlice = round((handles.ImSize(1)-1).*get(handles.slider1,'Value'))+1;
 handles.xSlice = round(get(handles.slider1,'Value'));
 set(handles.Slice1,'String',num2str(handles.xSlice));
-% handles.ySlice = round((handles.ImSize(2)-1).*get(handles.slider2,'Value'))+1;
 handles.ySlice = round(get(handles.slider2,'Value'));
 set(handles.slice2,'String',num2str(handles.ySlice));
-% handles.zSlice = round((handles.ImSize(3)-1).*get(handles.slider3,'Value'))+1;
 handles.zSlice = round(get(handles.slider3,'Value'));
 set(handles.edit3,'String',num2str(handles.zSlice));
 handles.Pixx = handles.PixCent1(handles.xSlice);
 handles.Pixy = handles.PixCent2(handles.ySlice);
 handles.Pixz = handles.PixCent3(handles.zSlice);
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
 handles.minvoxval = min(handles.CT_img(:));
 handles.maxvoxval = max(handles.CT_img(:));
 set(handles.minvalslider,'Min',min(handles.CT_img(:)));
@@ -175,9 +161,6 @@ set(handles.minvalslider,'Value',min(handles.CT_img(:)));
 set(handles.maxvalslider,'Value',max(handles.CT_img(:)));
 set(handles.minvaltxt,'String',num2str(handles.minvoxval));
 set(handles.maxvaltxt,'String',num2str(handles.maxvoxval))
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,0,1);
 [~,handles.xSlice_SP] = min(abs(handles.SPECTPixCent1 - handles.PixCent1(handles.xSlice)));
 [~,handles.ySlice_SP] = min(abs(handles.SPECTPixCent2 - handles.PixCent2(handles.ySlice)));
 [~,handles.zSlice_SP] = min(abs(handles.SPECTPixCent3 - handles.PixCent3(handles.zSlice)));
@@ -201,7 +184,7 @@ handles.rotam2 = str2double(get(handles.rotate2,'String')).*ones(1+length(handle
 handles.rotam3 = str2double(get(handles.rotate3,'String')).*ones(1+length(handles.ROIs_x),1);
 set(handles.axes1,'YDir','normal');
 set(handles.axes2,'YDir','normal');
-% set(handles.axes3,'YDir','normal');
+
 % Choose default command line output for VOIGUIv2
 handles.output = hObject;
 
@@ -234,8 +217,6 @@ function slider1_Callback(hObject, eventdata, handles)
 handles.xSlice = round(get(handles.slider1,'Value'));
 set(handles.Slice1,'String',num2str(handles.xSlice));
 handles.Pixx = handles.PixCent1(handles.xSlice);
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
 [~,handles.xSlice_SP] = min(abs(handles.SPECTPixCent1 - handles.PixCent1(handles.xSlice)));
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 
@@ -265,9 +246,6 @@ function slider2_Callback(hObject, eventdata, handles)
 handles.ySlice = round(get(handles.slider2,'Value'));
 set(handles.slice2,'String',num2str(handles.ySlice));
 handles.Pixy = handles.PixCent2(handles.ySlice);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-
 [~,handles.ySlice_SP] = min(abs(handles.SPECTPixCent2 - handles.PixCent2(handles.ySlice)));
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 
@@ -296,8 +274,6 @@ function slider3_Callback(hObject, eventdata, handles)
 handles.zSlice = round(get(handles.slider3,'Value'));
 set(handles.edit3,'String',num2str(handles.zSlice));
 handles.Pixz = handles.PixCent3(handles.zSlice);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 [~,handles.zSlice_SP] = min(abs(handles.SPECTPixCent3 - handles.PixCent3(handles.zSlice)));
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP,0,1);
 guidata(hObject, handles);
@@ -329,24 +305,10 @@ end
 set(handles.vert1,'String',num2str(handles.vertshift1(handles.VOIToTranslate+1)));
 set(handles.vert2,'String',num2str(handles.vertshift2(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate < 1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,-1,3);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,-1,3);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,-1,3);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,handles.ShiftAmount,3);
-    %     handles.ROIs_temp_y = shiftSingleROI(handles.ROIs_temp_y,-1,3);
-    %     handles.ROIs_temp_z = shiftSingleROI(handles.ROIs_temp_z,-1,3);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},-1,3);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},-1,3);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},-1,3);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)+handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -367,22 +329,10 @@ end
 set(handles.vert1,'String',num2str(handles.vertshift1(handles.VOIToTranslate+1)));
 set(handles.vert2,'String',num2str(handles.vertshift2(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate < 1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,1,3);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,1,3);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,1,3);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,-handles.ShiftAmount,3);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},1,3);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},1,3);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},1,3);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)-handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -403,23 +353,10 @@ end
 set(handles.horiz1,'String',num2str(handles.horizshift1(handles.VOIToTranslate+1)));
 set(handles.vert3,'String',num2str(handles.vertshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,-1,2);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,-1,2);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,-1,2);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,-handles.ShiftAmount,2);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},-1,2);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},-1,2);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},-1,2);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:)-handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -440,23 +377,10 @@ end
 set(handles.horiz1,'String',num2str(handles.horizshift1(handles.VOIToTranslate+1)));
 set(handles.vert3,'String',num2str(handles.vertshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,1,2);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,1,2);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,1,2);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,handles.ShiftAmount,2);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},1,2);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},1,2);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},1,2);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:)+handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -477,23 +401,10 @@ end
 set(handles.vert1,'String',num2str(handles.vertshift1(handles.VOIToTranslate+1)));
 set(handles.vert2,'String',num2str(handles.vertshift2(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,-1,3);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,-1,3);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,-1,3);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,handles.ShiftAmount,3);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},-1,3);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},-1,3);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},-1,3);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)+handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -514,23 +425,10 @@ end
 set(handles.vert1,'String',num2str(handles.vertshift1(handles.VOIToTranslate+1)));
 set(handles.vert2,'String',num2str(handles.vertshift2(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,1,3);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,1,3);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,1,3);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,-handles.ShiftAmount,3);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},1,3);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},1,3);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},1,3);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)-handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -551,23 +449,10 @@ end
 set(handles.horiz2,'String',num2str(handles.horizshift2(handles.VOIToTranslate+1)));
 set(handles.horiz3,'String',num2str(handles.horizshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,1,1);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,1,1);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,1,1);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,handles.ShiftAmount,1);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},1,1);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},1,1);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},1,1);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:)+handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -588,23 +473,10 @@ end
 set(handles.horiz2,'String',num2str(handles.horizshift2(handles.VOIToTranslate+1)));
 set(handles.horiz3,'String',num2str(handles.horizshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,-1,1);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,-1,1);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,-1,1);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,-handles.ShiftAmount,1);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},-1,1);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},-1,1);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},-1,1);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:)-handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -625,23 +497,10 @@ end
 set(handles.horiz1,'String',num2str(handles.horizshift1(handles.VOIToTranslate+1)));
 set(handles.vert3,'String',num2str(handles.vertshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,-1,2);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,-1,2);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,-1,2);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,-handles.ShiftAmount,2);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},-1,2);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},-1,2);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},-1,2);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:)-handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -662,23 +521,10 @@ end
 set(handles.horiz1,'String',num2str(handles.horizshift1(handles.VOIToTranslate+1)));
 set(handles.vert3,'String',num2str(handles.vertshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,1,2);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,1,2);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,1,2);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,handles.ShiftAmount,2);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},1,2);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},1,2);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},1,2);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(2,:)+handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -699,23 +545,10 @@ end
 set(handles.horiz2,'String',num2str(handles.horizshift2(handles.VOIToTranslate+1)));
 set(handles.horiz3,'String',num2str(handles.horizshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,-1,1);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,-1,1);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,-1,1);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,-handles.ShiftAmount,1);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},-1,1);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},-1,1);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},-1,1);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:)-handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -736,23 +569,10 @@ end
 set(handles.horiz2,'String',num2str(handles.horizshift2(handles.VOIToTranslate+1)));
 set(handles.horiz3,'String',num2str(handles.horizshift3(handles.VOIToTranslate+1)));
 if (handles.VOIToTranslate<1)
-    %     handles.ROIs_temp_x = shiftROI(handles.ROIs_temp_x,1,1);
-    %     handles.ROIs_temp_y = shiftROI(handles.ROIs_temp_y,1,1);
-    %     handles.ROIs_temp_z = shiftROI(handles.ROIs_temp_z,1,1);
     handles.ROIs_temp_mat = shiftSingleROI(handles.ROIs_temp_mat,handles.ShiftAmount,1);
 else
-    %     handles.ROIs_temp_x{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_x{handles.VOIToTranslate},1,1);
-    %     handles.ROIs_temp_y{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_y{handles.VOIToTranslate},1,1);
-    %     handles.ROIs_temp_z{handles.VOIToTranslate} = shiftSingleROI(handles.ROIs_temp_z{handles.VOIToTranslate},1,1);
     handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:) = handles.ROIs_temp_mat{handles.VOIToTranslate}(1,:)+handles.ShiftAmount;
 end
-% handles.axes1 = ViewSingleSliceOverlay(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_x,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize);
-% handles.axes2 = ViewSingleSliceOverlay(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_y,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize);
-% handles.axes3 = ViewSingleSliceOverlay(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_z,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1002,9 +822,9 @@ function clockwise1_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if (handles.VOIToTranslate<1)
-    handles.rotam1 = handles.rotam1-handles.RotateAmount;    
+    handles.rotam1 = handles.rotam1-handles.RotateAmount;
 else
-    handles.rotam1(handles.VOIToTranslate+1) = handles.rotam1(handles.VOIToTranslate+1)-handles.RotateAmount;    
+    handles.rotam1(handles.VOIToTranslate+1) = handles.rotam1(handles.VOIToTranslate+1)-handles.RotateAmount;
 end
 set(handles.rotate1,'String',num2str(handles.rotam1(handles.VOIToTranslate+1)));
 cent = zeros(3,1);
@@ -1018,10 +838,6 @@ else
     cent(3) = (max(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)) - min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)))./2 + min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:));
 end
 handles.ROIs_temp_mat = rotateROI(handles.ROIs_temp_mat,cent,-handles.RotateAmount,2,3,handles.VOIToTranslate);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1034,9 +850,9 @@ function anticlock1_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if (handles.VOIToTranslate<1)
-    handles.rotam1 = handles.rotam1+handles.RotateAmount;    
+    handles.rotam1 = handles.rotam1+handles.RotateAmount;
 else
-    handles.rotam1(handles.VOIToTranslate+1) = handles.rotam1(handles.VOIToTranslate+1)+handles.RotateAmount;    
+    handles.rotam1(handles.VOIToTranslate+1) = handles.rotam1(handles.VOIToTranslate+1)+handles.RotateAmount;
 end
 set(handles.rotate1,'String',num2str(handles.rotam1(handles.VOIToTranslate+1)));
 cent = zeros(3,1);
@@ -1050,9 +866,6 @@ else
     cent(3) = (max(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)) - min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)))./2 + min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:));
 end
 handles.ROIs_temp_mat = rotateROI(handles.ROIs_temp_mat,cent,handles.RotateAmount,2,3,handles.VOIToTranslate);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1064,9 +877,9 @@ function clockwise2_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if (handles.VOIToTranslate<1)
-    handles.rotam2 = handles.rotam2-handles.RotateAmount;    
+    handles.rotam2 = handles.rotam2-handles.RotateAmount;
 else
-    handles.rotam2(handles.VOIToTranslate+1) = handles.rotam2(handles.VOIToTranslate+1)-handles.RotateAmount;    
+    handles.rotam2(handles.VOIToTranslate+1) = handles.rotam2(handles.VOIToTranslate+1)-handles.RotateAmount;
 end
 set(handles.rotate2,'String',num2str(handles.rotam2(handles.VOIToTranslate+1)));
 cent = zeros(3,1);
@@ -1080,9 +893,6 @@ else
     cent(3) = (max(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)) - min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)))./2 + min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:));
 end
 handles.ROIs_temp_mat = rotateROI(handles.ROIs_temp_mat,cent,-handles.RotateAmount,1,3,handles.VOIToTranslate);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1094,9 +904,9 @@ function anticlock2_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if (handles.VOIToTranslate<1)
-    handles.rotam2 = handles.rotam2+handles.RotateAmount;    
+    handles.rotam2 = handles.rotam2+handles.RotateAmount;
 else
-    handles.rotam2(handles.VOIToTranslate+1) = handles.rotam2(handles.VOIToTranslate+1)+handles.RotateAmount;    
+    handles.rotam2(handles.VOIToTranslate+1) = handles.rotam2(handles.VOIToTranslate+1)+handles.RotateAmount;
 end
 set(handles.rotate2,'String',num2str(handles.rotam2(handles.VOIToTranslate+1)));
 cent = zeros(3,1);
@@ -1110,9 +920,6 @@ else
     cent(3) = (max(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)) - min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)))./2 + min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:));
 end
 handles.ROIs_temp_mat = rotateROI(handles.ROIs_temp_mat,cent,handles.RotateAmount,1,3,handles.VOIToTranslate);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1124,9 +931,9 @@ function clockwise3_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if (handles.VOIToTranslate<1)
-    handles.rotam3 = handles.rotam3+handles.RotateAmount;    
+    handles.rotam3 = handles.rotam3+handles.RotateAmount;
 else
-    handles.rotam3(handles.VOIToTranslate+1) = handles.rotam3(handles.VOIToTranslate+1)+handles.RotateAmount;    
+    handles.rotam3(handles.VOIToTranslate+1) = handles.rotam3(handles.VOIToTranslate+1)+handles.RotateAmount;
 end
 set(handles.rotate3,'String',num2str(handles.rotam3(handles.VOIToTranslate+1)));
 cent = zeros(3,1);
@@ -1140,9 +947,6 @@ else
     cent(3) = (max(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)) - min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)))./2 + min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:));
 end
 handles.ROIs_temp_mat = rotateROI(handles.ROIs_temp_mat,cent,handles.RotateAmount,1,2,handles.VOIToTranslate);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1154,9 +958,9 @@ function anticlock3_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if (handles.VOIToTranslate<1)
-    handles.rotam3 = handles.rotam3-handles.RotateAmount;    
+    handles.rotam3 = handles.rotam3-handles.RotateAmount;
 else
-    handles.rotam3(handles.VOIToTranslate+1) = handles.rotam3(handles.VOIToTranslate+1)-handles.RotateAmount;    
+    handles.rotam3(handles.VOIToTranslate+1) = handles.rotam3(handles.VOIToTranslate+1)-handles.RotateAmount;
 end
 set(handles.rotate3,'String',num2str(handles.rotam3(handles.VOIToTranslate+1)));
 cent = zeros(3,1);
@@ -1170,9 +974,6 @@ else
     cent(3) = (max(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)) - min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:)))./2 + min(handles.ROIs_temp_mat{handles.VOIToTranslate}(3,:));
 end
 handles.ROIs_temp_mat = rotateROI(handles.ROIs_temp_mat,cent,-handles.RotateAmount,1,2,handles.VOIToTranslate);
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1318,9 +1119,9 @@ if(handles.nSurfs > 1)
         R = ROIVox{I(i)};
         CombROIVox(R>0) = i.*R(R>0);
     end
-    writeROIuint8File([PathName FileName(1:end-4)  '_Comb_CTVox' ],CombROIVox);   
+    writeROIuint8File([PathName FileName(1:end-4)  '_Comb_CTVox' ],CombROIVox);
     progressbar('Saving Individual Voxellised ROIs (SPECT Voxel Grid)');
-    for i = 1:handles.nSurfs        
+    for i = 1:handles.nSurfs
         SPECTROIVox{i} = CreateROIVox(handles.Surface{i},handles.SPECTPixCent1,handles.SPECTPixCent2,handles.SPECTPixCent3);
         writeMIDASROIFile([PathName FileName(1:end-4) handles.OrganNames{i+1}(1:end-4) '_SPECTVox' ],SPECTROIVox{i});
         progressbar(i./handles.nSurfs)
@@ -1332,12 +1133,12 @@ if(handles.nSurfs > 1)
         CombSPECTROIVox(R>0) = i.*R(R>0);
     end
     writeROIuint8File([PathName FileName(1:end-4)  '_Comb_SPECTVox' ],CombSPECTROIVox);
-else   
+else
     handles.Surface.vertices = ROIs{1}';
     ROIVox = CreateROIVox(handles.Surface,handles.PixCent1,handles.PixCent2,handles.PixCent3);
-    writeMIDASROIFile([PathName FileName(1:end-4) handles.OrganNames(1:end-4) '_CTVox' ],ROIVox);            
+    writeMIDASROIFile([PathName FileName(1:end-4) handles.OrganNames(1:end-4) '_CTVox' ],ROIVox);
     SPECTROIVox = CreateROIVox(handles.Surface,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.SPECTPixCent3);
-    writeMIDASROIFile([PathName FileName(1:end-4) handles.OrganNames(1:end-4) '_SPECTVox' ],SPECTROIVox);  
+    writeMIDASROIFile([PathName FileName(1:end-4) handles.OrganNames(1:end-4) '_SPECTVox' ],SPECTROIVox);
     stlwrite([PathName FileName(1:end-4) handles.OrganNames(1:end-4) '_Shift.stl' ],handles.Surface);
 end
 guidata(hObject, handles);
@@ -1353,9 +1154,6 @@ function minvalslider_Callback(hObject, eventdata, handles)
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 handles.minvoxval = get(hObject,'Value');
 set(handles.minvaltxt,'String',num2str(handles.minvoxval))
-% caxis(handles.axes1,[handles.minvoxval 0.7.*handles.maxvoxval])
-% caxis(handles.axes2,[handles.minvoxval 0.7.*handles.maxvoxval])
-% caxis(handles.axes3,[handles.minvoxval 0.7.*handles.maxvoxval])
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1407,9 +1205,6 @@ function maxvalslider_Callback(hObject, eventdata, handles)
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 handles.maxvoxval = get(hObject,'Value');
 set(handles.maxvaltxt,'String',num2str(handles.maxvoxval))
-% caxis(handles.axes1,[handles.minvoxval 0.7.*handles.maxvoxval])
-% caxis(handles.axes2,[handles.minvoxval 0.7.*handles.maxvoxval])
-% caxis(handles.axes3,[handles.minvoxval 0.7.*handles.maxvoxval])
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
@@ -1460,14 +1255,10 @@ function optim_pushbutton_Callback(hObject, eventdata, handles)
 for i = 1:handles.nSurfs
     handles.ROIs_temp_mat{i} = ShiftSurface{i}.vertices';
 end
-% handles.axes1 = ViewSingleSliceOverlay_Mat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes2 = ViewSingleSliceOverlay_Mat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,1);
-% handles.axes3 = ViewSingleSliceOverlay_Mat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval);
-
 handles.axes1 = ViewSingleSliceOverlay_SPECTMat(handles.axes1,handles.CT_img,handles.xSlice,1,handles.ROIs_temp_mat,handles.PixCent2,handles.PixCent3,handles.Pixx,handles.PixxSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.xSlice_SP,1);
 handles.axes2 = ViewSingleSliceOverlay_SPECTMat(handles.axes2,handles.CT_img,handles.ySlice,2,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent3,handles.Pixy,handles.PixySize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent3,handles.ySlice_SP,1);
 handles.axes3 = ViewSingleSliceOverlay_SPECTMat(handles.axes3,handles.CT_img,handles.zSlice,3,handles.ROIs_temp_mat,handles.PixCent1,handles.PixCent2,handles.Pixz,handles.PixzSize,handles.minvoxval,handles.maxvoxval,handles.SPECT_img,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.zSlice_SP);
-
+guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
 function figure1_CreateFcn(hObject, eventdata, handles)
@@ -1488,8 +1279,8 @@ if(handles.nSurfs > 1)
 else
     handles.Surface.vertices =handles.ROIs_temp_mat{1}';
 end
-StockFillGUI(handles.SPECT_img,handles.SPECThdr,handles.CThdr,handles.Surface,handles.OrganNames(2:end))
-
+StockFillGUI(handles.SPECT_Images,handles.SPECThdr,handles.CThdr,handles.Surface,handles.OrganNames(2:end),handles.FileNames);
+guidata(hObject, handles);
 
 % --- Executes on button press in indiv_button.
 function indiv_button_Callback(hObject, eventdata, handles)
@@ -1503,11 +1294,49 @@ if(handles.nSurfs > 1)
 else
     handles.Surface.vertices =handles.ROIs_temp_mat{1}';
 end
-InsertFillGUI(handles.SPECT_img,handles.SPECThdr,handles.CThdr,handles.Surface,handles.OrganNames(2:end))
+% size(handles.SPECT_Images)
+% InsertFillGUI(handles.SPECT_Images,handles.SPECThdr,handles.CThdr,handles.Surface,handles.OrganNames(2:end),handles.FileNames)
+%
+InsertFillGUI(handles.SPECT_Images,handles.SPECThdr,handles.CThdr,handles.Surface,handles.OrganNames(2:end),handles.FileNames)
+guidata(hObject, handles);
 
-
-% --- Executes on button press in save_cf_button.
-function save_cf_button_Callback(hObject, eventdata, handles)
-% hObject    handle to save_cf_button (see GCBO)
+% --- Executes on button press in loadhermes_button.
+function loadhermes_button_Callback(hObject, eventdata, handles)
+% hObject    handle to loadhermes_button (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+[FileName,PathName] = uigetfile('*.dcm','Select the Hermes SPECT files to open','MultiSelect', 'on');
+if (iscell(FileName))
+    n_h_imgs = length(FileName);
+    %     handles.SPECT_img = double(squeeze(dicm_img([PathName FileName{1}])));
+    %     specthdr = dicm_hdr([PathName FileName{1}]);
+    for i = 1:n_h_imgs
+        %         handles.hSPECT_Images{i} = double(squeeze(dicm_img([PathName FileName{i}])));
+        handles.hSPECT_Images{i} = LoadAndAlignHermesImage([PathName FileName{i}],handles.SPECThdr);
+    end
+else
+    %     handles.hSPECT_Images = double(squeeze(dicm_img([PathName FileName])));
+    handles.hSPECT_Images = LoadAndAlignHermesImage([PathName FileName],handles.SPECThdr);
+    %     specthdr = dicm_hdr([PathName FileName]);
+end
+i = 1;
+for k = (handles.n_imgs+1):(handles.n_imgs + n_h_imgs)
+    handles.SPECT_Images{k} = handles.hSPECT_Images{i};
+    i = i+1;
+end
+if (iscell(handles.FileNames))
+    i = 1;
+    for k = (handles.n_imgs+1):(handles.n_imgs + n_h_imgs)
+        handles.FileNames{k} = FileName{i};
+        i = i+1;
+    end
+else
+    handles.FileNames{1} = handles.FileNames;
+    i = 1;
+    for k = (handles.n_imgs+1):(handles.n_imgs + n_h_imgs)
+        handles.FileNames{k} = FileName{i};
+        i = i+1;
+    end
+end
+handles.n_imgs = handles.n_imgs + n_h_imgs;
+guidata(hObject, handles);
