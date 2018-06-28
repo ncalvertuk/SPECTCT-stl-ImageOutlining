@@ -8,16 +8,19 @@ This tool has been written and tested using SPECT/CT files obtained using the GE
 Images from other scanners may work but are not supported.
 
 The application is ran with no inputs, upon execution the user will be asked to locate the CT files to import.
-Once the CT images have been imported, the user will then be asked to import the SPECT file and subsequently the .stl files.
+Once the CT images have been imported, the user will then be asked to import the SPECT files and subsequently the .stl files.
+Multiple SPECT files can be imported, however only the first file will be shown.
+Hermes format files can also be imported.
 The triangular meshes can be translated and rotated so that they line up with the CT by using the buttons at the bottom of the GUI. The CT image contrast can be altered using the top sliders.
-The SPECT images are overlaid on top of the CT images to aid with alignment.
+The SPECT image is overlaid on top of the CT images to aid with alignment.
 
 Once the meshes have been aligned, calibration factors can be calculated by using one of the buttons at the top-right of the GUI labelled 'Stock Fill' and 'Individual Fill'.
 
 Stock Fill is used if the inserts were filled from a stock radioactive solution, Individual Fill is used if the inserts were filled with individual activityu concentrations.
 Currently Lu-177, Y-90, I-131, and Tc-99m is supported.
 
-The ROIs and the calibration factors can be saved using the appropriate buttons.
+The ROIs and the calibration factors can be saved using the appropriate buttons. The calibration factors are calculated for each image and held in a matrix. 
+Each row corresponds to a separate VOI and each column corresponds to a separate image. The FileNames variable indicates the ordering of the images.
 
 WARNING: The Optimise stl Positions tool is experimental and may not work very well. It is *NOT* suited for images where there is significant spill-in to the ROIs.
 

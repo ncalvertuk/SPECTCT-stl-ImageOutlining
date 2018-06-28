@@ -53,7 +53,11 @@ function InsertFillGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 % varargin   command line arguments to InsertFillGUI (see VARARGIN)
 handles.iROI = get(handles.roi_popupmenu,'Value');
 handles.SPECTImage = varargin{1};
-handles.SPECTsize = size(handles.SPECTImage);
+if (iscell(handles.SPECTImage))
+    handles.SPECTsize = size(handles.SPECTImage{1});
+else
+    handles.SPECTsize = size(handles.SPECTImage);
+end
 handles.SPECThdr = varargin{2};
 handles.SPECTPixSize = handles.SPECThdr.PixelSpacing;
 handles.SPECTSliceThick = handles.SPECThdr.SliceThickness;
@@ -73,20 +77,26 @@ handles.PixCent2 = CTimgPosition(1,2) + (0:(handles.CTsize(2)-1))*handles.CTPixS
 handles.PixCent3 = CTimgPosition(:,3);
 handles.Surface = varargin{4};
 handles.ROINames = varargin{5};
+handles.FileNames = varargin{6};
 handles.CTPixSize(3) = abs(handles.PixCent3(2) - handles.PixCent3(1));
-handles.ROI = zeros(size(handles.SPECTImage));
+handles.ROI = zeros(handles.SPECTsize);
+if (iscell(handles.SPECTImage))
+    handles.n_imgs = length(handles.SPECTImage);
+else
+    handles.n_imgs = 1;
+end
 if(iscell(handles.Surface))
     handles.nSurfs = length(handles.Surface);
-    handles.meancounts = zeros(handles.nSurfs,1);
-    handles.stdcounts = zeros(handles.nSurfs,1);
+    handles.meancounts = zeros(handles.nSurfs,handles.n_imgs);
+    handles.stdcounts = zeros(handles.nSurfs,handles.n_imgs);
     handles.vols = handles.meancounts;
     handles.roivols = handles.meancounts;
     for i = 1:handles.nSurfs
         [meancounts,stdcounts,roivol,R] = STLCountsUncert(handles.CTPixSize,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.SPECTImage,handles.Surface{i},20);
-        handles.meancounts(i,1) = meancounts;
-        handles.stdcounts(i,1) = stdcounts;
+        handles.meancounts(i,:) = meancounts;
+        handles.stdcounts(i,:) = stdcounts;
         handles.vols(i) = MeshVolCalc(handles.Surface{i},0)./1000;
-        handles.roivols(i) = roivol;
+        handles.roivols(i,:) = roivol;
         handles.ROI = handles.ROI+i.*R;
     end
 else
@@ -169,7 +179,7 @@ handles.InsertWeight = handles.InsertFullWeight-handles.InsertEmptyWeight;
 set(handles.insertweight_text,'String',sprintf('%0.2f',handles.InsertWeight(handles.iROI)));
 
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
@@ -177,20 +187,23 @@ set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(h
 
 set(handles.stlvol_text,'String',sprintf('%0.2f',handles.vols(handles.iROI)));
 
-set(handles.voivol_text,'String',sprintf('%0.2f',handles.roivols(handles.iROI)));
-set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI)));
-set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI)));
+set(handles.voivol_text,'String',sprintf('%0.2f',handles.roivols(handles.iROI,1)));
+set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI,1)));
+set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI,1)));
 handles.ScanDur = 60*20;
-handles.mean_cf = zeros(handles.nSurfs,1);
-handles.sigma_cf = zeros(handles.nSurfs,1);
+handles.mean_cf = zeros(handles.nSurfs,handles.n_imgs);
+handles.sigma_cf = zeros(handles.nSurfs,handles.n_imgs);
 handles.insert_scanned_act_sigma = zeros(handles.nSurfs,1);
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 
 % Choose default command line output for InsertFillGUI
@@ -223,8 +236,8 @@ function roi_popupmenu_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns roi_popupmenu contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from roi_popupmenu
 handles.iROI = get(hObject,'Value');
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 set(handles.insertact_text,'String',num2str(handles.insertact(handles.iROI)));
 set(handles.insertactuncert_text,'String',num2str(handles.insertactuncert(handles.iROI)));
@@ -252,9 +265,9 @@ set(handles.totalactivityuncert_text,'String',sprintf('%0.2f',handles.insert_sca
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 set(handles.stlvol_text,'String',sprintf('%0.2f',handles.vols(handles.iROI)));
-set(handles.voivol_text,'String',sprintf('%0.2f',handles.roivols(handles.iROI)));
-set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI)));
-set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI)));
+set(handles.voivol_text,'String',sprintf('%0.2f',handles.roivols(handles.iROI,1)));
+set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI,1)));
+set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI,1)));
 guidata(hObject, handles);
 
 
@@ -350,18 +363,21 @@ function insertact_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of insertact_text as a double
 handles.insertact(handles.iROI) = str2double(get(hObject,'String'));
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -389,13 +405,16 @@ function insertactuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of insertactuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of insertactuncert_text as a double
 handles.insertactuncert(handles.iROI) = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -423,18 +442,21 @@ function insertacthour_text_Callback(hObject, eventdata, handles)
 handles.inserthour(handles.iROI) = str2double(get(hObject,'String')).*handles.hour;
 handles.inserttime = handles.inserthour+handles.insertmin+handles.insertsec;
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -464,18 +486,21 @@ function insertactmin_text_Callback(hObject, eventdata, handles)
 handles.insertmin(handles.iROI) = str2double(get(hObject,'String')).*handles.minute;
 handles.inserttime = handles.inserthour+handles.insertmin+handles.insertsec;
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -503,18 +528,21 @@ function insertactsec_text_Callback(hObject, eventdata, handles)
 handles.insertsec(handles.iROI) = str2double(get(hObject,'String'));
 handles.inserttime = handles.inserthour+handles.insertmin+handles.insertsec;
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -542,13 +570,16 @@ function insertacthouruncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of insertacthouruncert_text as a double
 handles.inserthouruncert(handles.iROI) = str2double(get(hObject,'String')).*handles.hour;
 handles.inserttimeuncert = handles.inserthouruncert+handles.insertminuncert+handles.insertsecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -576,13 +607,16 @@ function insertactminuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of insertactminuncert_text as a double
 handles.insertminuncert(handles.iROI) = str2double(get(hObject,'String')).*handles.minute;
 handles.inserttimeuncert = handles.inserthouruncert+handles.insertminuncert+handles.insertsecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -610,13 +644,16 @@ function insertactsecuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of insertactsecuncert_text as a double
 handles.insertsecuncert(handles.iROI) = str2double(get(hObject,'String'));
 handles.inserttimeuncert = handles.inserthouruncert+handles.insertminuncert+handles.insertsecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -644,18 +681,21 @@ function resact_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of resact_text as a double
 handles.resact(handles.iROI) = str2double(get(hObject,'String'));
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -681,13 +721,16 @@ function resactuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of resactuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of resactuncert_text as a double
 handles.resactuncert(handles.iROI) = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -716,18 +759,21 @@ function restacthour_text_Callback(hObject, eventdata, handles)
 handles.reshour(handles.iROI) = str2double(get(hObject,'String')).*handles.hour;
 handles.restime = handles.reshour+handles.resmin+handles.ressec;
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -756,18 +802,21 @@ function restactmin_text_Callback(hObject, eventdata, handles)
 handles.resmin(handles.iROI) = str2double(get(hObject,'String')).*handles.minute;
 handles.restime = handles.reshour+handles.resmin+handles.ressec;
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -796,18 +845,21 @@ function restactsec_text_Callback(hObject, eventdata, handles)
 handles.ressec(handles.iROI) = str2double(get(hObject,'String'));
 handles.restime = handles.reshour+handles.resmin+handles.ressec;
 for i = 1:handles.nSurfs
-    handles.insert_scanned_act(i) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
+    handles.insert_scanned_act(i,1) = CalcStockAct(handles.insertact(i),handles.resact(i),handles.restime(i),handles.inserttime(i),handles.acqtime,handles.IsotopeTau(handles.IsotopeID));
 end
 set(handles.insertactivity_text,'String',sprintf('%0.2f',(handles.insert_scanned_act(handles.iROI))));
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -835,13 +887,16 @@ function restacthouruncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of restacthouruncert_text as a double
 handles.reshouruncert(handles.iROI) = str2double(get(hObject,'String')).*handles.hour;
 handles.restimeuncert = handles.reshouruncert+handles.resminuncert+handles.ressecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -869,13 +924,16 @@ function restactminuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of restactminuncert_text as a double
 handles.resminuncert(handles.iROI) = str2double(get(hObject,'String')).*handles.minute;
 handles.restimeuncert = handles.reshouruncert+handles.resminuncert+handles.ressecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -902,13 +960,16 @@ function restactsecuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of restactsecuncert_text as a double
 handles.ressecuncert(handles.iROI) = str2double(get(hObject,'String'));
 handles.restimeuncert = handles.reshouruncert+handles.resminuncert+handles.ressecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
 
@@ -936,14 +997,17 @@ function emptyweight_text_Callback(hObject, eventdata, handles)
 handles.InsertEmptyWeight(handles.iROI) = str2double(get(hObject,'String'));
 handles.InsertWeight = handles.InsertFullWeight-handles.InsertEmptyWeight;
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
 set(handles.insertweight_text,'String',sprintf('%0.2f',handles.InsertWeight(handles.iROI)));
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
@@ -971,10 +1035,13 @@ function emptyweightuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of emptyweightuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of emptyweightuncert_text as a double
 handles.InsertEmptyWeightUncert(handles.iROI) = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 guidata(hObject, handles);
@@ -1003,14 +1070,17 @@ function fullweight_text_Callback(hObject, eventdata, handles)
 handles.InsertFullWeight(handles.iROI) = str2double(get(hObject,'String'));
 handles.InsertWeight = handles.InsertFullWeight-handles.InsertEmptyWeight;
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
 set(handles.insertweight_text,'String',sprintf('%0.2f',handles.InsertWeight(handles.iROI)));
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
@@ -1039,13 +1109,16 @@ function fullweightuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of fullweightuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of fullweightuncert_text as a double
 handles.InsertFullWeightUncert(handles.iROI) = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
 
@@ -1078,8 +1151,9 @@ inserttime = handles.inserttime;inserttimeuncert = handles.inserttimeuncert;resa
 InsertEmptyWeight=handles.InsertEmptyWeight;InsertEmptyWeightUncert=handles.InsertEmptyWeightUncert;InsertFullWeight=handles.InsertFullWeight;InsertFullWeightUncert=handles.InsertFullWeightUncert;
 IsotopeTau = handles.IsotopeTau(handles.IsotopeID);insert_scanned_act=handles.insert_scanned_act;InsertWeight=handles.InsertWeight;insert_scanned_act_conc=handles.insertactconc;
 ScanDur=handles.ScanDur;mean_cf=handles.mean_cf;sigma_cf=handles.sigma_cf;insertact=handles.insertact;insertactuncert=handles.insertactuncert;resact=handles.resact;resactuncert=handles.resactuncert;
+FileNames = handles.FileNames;
 save(savename,'SPECTImage','ROI','Surface','ROINames','ROI','meancounts','stdcounts','vols','roivols','acqtime','insertact','insertactuncert','inserttime','inserttimeuncert','resact','resactuncert',...
-    'restime','restimeuncert','IsotopeTau','InsertEmptyWeight','InsertEmptyWeightUncert','InsertFullWeight','InsertFullWeightUncert','InsertWeight','ScanDur','mean_cf','sigma_cf','insert_scanned_act_conc');
+    'restime','restimeuncert','IsotopeTau','InsertEmptyWeight','InsertEmptyWeightUncert','InsertFullWeight','InsertFullWeightUncert','InsertWeight','ScanDur','mean_cf','sigma_cf','insert_scanned_act_conc','FileNames','insert_scanned_act');
 
 
 
@@ -1093,14 +1167,17 @@ function isotope_pop_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from isotope_pop
 handles.IsotopeID = get(handles.isotope_pop,'Value');
 set(handles.tau_text,'String',sprintf('%0.2f',(handles.IsotopeTau(handles.IsotopeID))));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i),handles.insert_scanned_act(i),handles.insert_scanned_act_sigma(i)] = Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...                
-        handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k),handles.insert_scanned_act(i,1),handles.insert_scanned_act_sigma(i,1)] = ...
+            Calc_cfuncert_insert(handles.insertact(i),handles.resact(i),handles.insertactuncert(i),handles.resactuncert(i),...
+            handles.inserttime(i),handles.restime(i),handles.acqtime,handles.inserttimeuncert(i),handles.restimeuncert(i),...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
 handles.insertactconc = handles.insert_scanned_act./handles.InsertWeight;
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 set(handles.actconcuncert_text,'String',sprintf('%0.2f',handles.insert_scanned_act_sigma(handles.iROI)));
 set(handles.insertactconc_text,'String',sprintf('%0.2f',(handles.insertactconc(handles.iROI))));
 guidata(hObject, handles);

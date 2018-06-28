@@ -61,7 +61,6 @@ handles.SPECTPixCent1 = handles.SPECTImagePosition(1) + (0:(handles.SPECTsize(1)
 handles.SPECTPixCent2 = handles.SPECTImagePosition(2) + (0:(handles.SPECTsize(2)-1))*handles.SPECTPixSize(2);
 handles.SPECTPixCent3 = handles.SPECTImagePosition(3) - (0:(handles.SPECTsize(3)-1))*handles.SPECTSliceThick;
 handles.CThdr = varargin{3};
-% CTimgPosition = zeros(size(CT_img,3),3);
 for i = 1:length(handles.CThdr)
     CTimgPosition(i,:) = handles.CThdr{i}.ImagePositionPatient;
 end
@@ -72,20 +71,26 @@ handles.PixCent2 = CTimgPosition(1,2) + (0:(handles.CTsize(2)-1))*handles.CTPixS
 handles.PixCent3 = CTimgPosition(:,3);
 handles.Surface = varargin{4};
 handles.ROINames = varargin{5};
+handles.FileNames = varargin{6};
 handles.CTPixSize(3) = abs(handles.PixCent3(2) - handles.PixCent3(1));
-handles.ROI = zeros(size(handles.SPECTImage));
+handles.ROI = zeros([length(handles.SPECTPixCent1) length(handles.SPECTPixCent2) length(handles.SPECTPixCent3)]);
+if (iscell(handles.SPECTImage))
+    handles.n_imgs = length(handles.SPECTImage);
+else
+    handles.n_imgs = 1;
+end
 if(iscell(handles.Surface))
     handles.nSurfs = length(handles.Surface);
-    handles.meancounts = zeros(handles.nSurfs,1);
-    handles.stdcounts = zeros(handles.nSurfs,1);
+    handles.meancounts = zeros(handles.nSurfs,handles.n_imgs);
+    handles.stdcounts = zeros(handles.nSurfs,handles.n_imgs);
     handles.vols = handles.meancounts;
     handles.roivols = handles.meancounts;
     for i = 1:handles.nSurfs
         [meancounts,stdcounts,roivol,R] = STLCountsUncert(handles.CTPixSize,handles.SPECTPixCent1,handles.SPECTPixCent2,handles.SPECTPixCent3,handles.SPECTImage,handles.Surface{i},20);
-        handles.meancounts(i,1) = meancounts;
-        handles.stdcounts(i,1) = stdcounts;
+        handles.meancounts(i,:) = meancounts;
+        handles.stdcounts(i,:) = stdcounts;
         handles.vols(i) = MeshVolCalc(handles.Surface{i},0)./1000;
-        handles.roivols(i) = roivol;
+        handles.roivols(i,:) = roivol;
         handles.ROI = handles.ROI+i.*R;
     end
 else
@@ -169,22 +174,24 @@ set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)
 
 set(handles.stlvol_text,'String',sprintf('%0.2f',handles.vols(handles.iROI)));
 
-set(handles.edit30,'String',sprintf('%0.2f',handles.roivols(handles.iROI)));
+set(handles.edit30,'String',sprintf('%0.2f',handles.roivols(handles.iROI,1)));
 
-set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI)));
-set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI)));
+set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI,1)));
+set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI,1)));
 handles.ScanDur = 60*20;
-handles.mean_cf = zeros(handles.nSurfs,1);
-handles.sigma_cf = zeros(handles.nSurfs,1);
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+handles.mean_cf = zeros(handles.nSurfs,handles.n_imgs);
+handles.sigma_cf = zeros(handles.nSurfs,handles.n_imgs);
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i,k),handles.sigma_cf(i,k)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 % Choose default command line output for StockFillGUI
 handles.output = hObject;
 
@@ -291,15 +298,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 
@@ -325,15 +334,17 @@ function stockact_uncert_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of stockact_uncert as text
 %        str2double(get(hObject,'String')) returns contents of stockact_uncert as a double
 handles.stockactuncert = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -366,15 +377,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -407,15 +420,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -448,15 +463,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -488,15 +505,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -521,15 +540,17 @@ function resactuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of resactuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of resactuncert_text as a double
 handles.resactuncert = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -562,15 +583,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -603,15 +626,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -644,15 +669,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -682,15 +709,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -715,15 +744,17 @@ function stockemptyuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of stockemptyuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of stockemptyuncert_text as a double
 handles.stockemptyweightuncert = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -753,15 +784,17 @@ set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.S
 handles.stock_scanned_actconc = handles.stock_scanned_act/handles.StockVol;
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -786,15 +819,17 @@ function stockfulluncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of stockfulluncert_text as text
 %        str2double(get(hObject,'String')) returns contents of stockfulluncert_text as a double
 handles.stockfullweightuncert = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -826,15 +861,17 @@ handles.StockVol = handles.stockfullweight - handles.stockemptyweight;
 set(handles.edit21,'String',sprintf('%0.2f',(handles.stock_scanned_act/handles.StockVol)));
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -929,15 +966,17 @@ function stockhouruncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of stockhouruncert_text as a double
 handles.stockhouruncert = str2double(get(hObject,'String')).*handles.hour;
 handles.stocktimeuncert = handles.stockhouruncert+handles.stockminuncert+handles.stocksecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -963,15 +1002,17 @@ function stockminuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of stockminuncert_text as a double
 handles.stockminuncert = str2double(get(hObject,'String')).*handles.minute;
 handles.stocktimeuncert = handles.stockhouruncert+handles.stockminuncert+handles.stocksecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -997,15 +1038,17 @@ function stocksecuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of stocksecuncert_text as a double
 handles.stocksecuncert = str2double(get(hObject,'String'));
 handles.stocktimeuncert = handles.stockhouruncert+handles.stockminuncert+handles.stocksecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1031,15 +1074,17 @@ function reshouruncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of reshouruncert_text as a double
 handles.reshouruncert = str2double(get(hObject,'String')).*handles.hour;
 handles.restimeuncert = handles.reshouruncert+handles.resminuncert+handles.ressecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1065,15 +1110,17 @@ function resminuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of resminuncert_text as a double
 handles.resminuncert = str2double(get(hObject,'String')).*handles.minute;
 handles.restimeuncert = handles.reshouruncert+handles.resminuncert+handles.ressecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1099,15 +1146,17 @@ function ressecuncert_text_Callback(hObject, eventdata, handles)
 %        str2double(get(hObject,'String')) returns contents of ressecuncert_text as a double
 handles.ressecuncert = str2double(get(hObject,'String'));
 handles.restimeuncert = handles.reshouruncert+handles.resminuncert+handles.ressecuncert;
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1138,14 +1187,14 @@ set(handles.insertfull_text,'String',num2str(handles.InsertFullWeight(handles.iR
 set(handles.insertfulluncert_text,'String',num2str(handles.InsertFullWeightUncert(handles.iROI)));
 set(handles.edit27,'String',sprintf('%0.2f',handles.InsertWeight(handles.iROI)));
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
 set(handles.stlvol_text,'String',sprintf('%0.2f',handles.vols(handles.iROI)));
 
 set(handles.edit30,'String',sprintf('%0.2f',handles.roivols(handles.iROI)));
 
-set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI)));
-set(handles.countsuncert_text,'String',sprintf('%0.2f',handles.stdcounts(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI,1)));
+set(handles.counts_text,'String',sprintf('%0.2f',handles.meancounts(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1174,15 +1223,17 @@ handles.InsertWeight = handles.InsertFullWeight-handles.InsertEmptyWeight;
 set(handles.edit27,'String',sprintf('%0.2f',handles.InsertWeight(handles.iROI)));
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1207,15 +1258,17 @@ function insertemptyuncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of insertemptyuncert_text as text
 %        str2double(get(hObject,'String')) returns contents of insertemptyuncert_text as a double
 handles.InsertEmptyWeightUncert(handles.iROI) = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 
@@ -1245,15 +1298,17 @@ handles.InsertWeight = handles.InsertFullWeight-handles.InsertEmptyWeight;
 set(handles.edit27,'String',sprintf('%0.2f',handles.InsertWeight(handles.iROI)));
 handles.InsertActivity = handles.stock_scanned_actconc.*handles.InsertWeight;
 set(handles.edit26,'String',sprintf('%0.2f',handles.InsertActivity(handles.iROI)));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1278,15 +1333,17 @@ function insertfulluncert_text_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'String') returns contents of insertfulluncert_text as text
 %        str2double(get(hObject,'String')) returns contents of insertfulluncert_text as a double
 handles.InsertFullWeightUncert(handles.iROI) = str2double(get(hObject,'String'));
-for i = 1:handles.nSurfs
-    [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
-        handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
-        handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
-        handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
-        handles.meancounts(i),handles.stdcounts(i),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+for k = 1:handles.n_imgs
+    for i = 1:handles.nSurfs
+        [handles.mean_cf(i),handles.sigma_cf(i)] = Calc_cfuncert_stock(handles.stockact,handles.resact,handles.stockactuncert,handles.resactuncert,handles.stockfullweight,handles.stockfullweightuncert,...
+            handles.stockemptyweight,handles.stockemptyweightuncert,handles.InsertFullWeight(i),...
+            handles.InsertFullWeightUncert(i),handles.InsertEmptyWeight(i),handles.InsertEmptyWeightUncert(i),...
+            handles.stocktime,handles.restime,handles.acqtime,handles.stocktimeuncert,handles.restimeuncert,...
+            handles.meancounts(i,k),handles.stdcounts(i,k),handles.ScanDur,handles.IsotopeTau(handles.IsotopeID));
+    end
 end
-set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI)));
-set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI)));
+set(handles.cf_text,'String',sprintf('%0.2f',handles.mean_cf(handles.iROI,1)));
+set(handles.cfuncert_text,'String',sprintf('%0.2f',handles.sigma_cf(handles.iROI,1)));
 guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
@@ -1530,4 +1587,10 @@ stocktime = handles.stocktime;stocktimeuncert = handles.stocktimeuncert;resact=h
 stockemptyweight=handles.stockemptyweight;stockemptyweightuncert=handles.stockemptyweightuncert;stockfullweight=handles.stockfullweight;stockfullweightuncert=handles.stockfullweightuncert;
 IsotopeTau = handles.IsotopeTau(handles.IsotopeID);stock_scanned_act=handles.stock_scanned_act;StockVol=handles.StockVol;stock_scanned_actconc=handles.stock_scanned_actconc;InsertEmptyWeight=handles.InsertEmptyWeight;InsertEmptyWeightUncert=handles.InsertEmptyWeightUncert;
 InsertFullWeight=handles.InsertFullWeight;InsertFullWeightUncert=handles.InsertFullWeightUncert;InsertWeight=handles.InsertWeight;InsertActivity=handles.InsertActivity;ScanDur=handles.ScanDur;mean_cf=handles.mean_cf;sigma_cf=handles.sigma_cf;
-save(savename,'SPECTImage','ROI','Surface','ROINames','ROI','meancounts','stdcounts','vols','roivols','acqtime','stockact','stockactuncert','stocktime','stocktimeuncert','resact','resactuncert','restime','restimeuncert','stockemptyweight','stockemptyweightuncert','stockfullweight','stockfullweightuncert','IsotopeTau','stock_scanned_act','StockVol','stock_scanned_actconc','InsertEmptyWeight','InsertEmptyWeightUncert','InsertFullWeight','InsertFullWeightUncert','InsertWeight','InsertActivity','ScanDur','mean_cf','sigma_cf');
+FileNames = handles.FileNames;
+save(savename,'SPECTImage','ROI','Surface','ROINames','ROI','meancounts','stdcounts',...
+    'vols','roivols','acqtime','stockact','stockactuncert','stocktime','stocktimeuncert',...
+    'resact','resactuncert','restime','restimeuncert','stockemptyweight','stockemptyweightuncert',...
+    'stockfullweight','stockfullweightuncert','IsotopeTau','stock_scanned_act','StockVol',...
+    'stock_scanned_actconc','InsertEmptyWeight','InsertEmptyWeightUncert','InsertFullWeight',...
+    'InsertFullWeightUncert','InsertWeight','InsertActivity','ScanDur','mean_cf','sigma_cf','FileName');
