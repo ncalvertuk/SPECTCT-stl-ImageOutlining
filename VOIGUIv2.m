@@ -88,6 +88,7 @@ if (iscell(FileName))
         handles.SPECT_Images{i} = double(squeeze(dicm_img([PathName FileName{i}])));
     end
 else
+    n_imgs = 1;
     handles.SPECT_img = double(squeeze(dicm_img([PathName FileName])));
     handles.SPECT_Images{1} = double(squeeze(dicm_img([PathName FileName])));
     specthdr = dicm_hdr([PathName FileName]);
